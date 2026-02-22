@@ -2292,53 +2292,6 @@ class ComplexAICog(commands.Cog):
             logger.error(f"Inventory request detection error: {e}")
             return False
 
-    def _extract_requested_command(self, content: str) -> Optional[str]:
-        """Extract a specific command name from a natural-language question."""
-        try:
-            if not content:
-                return None
-
-            quoted = re.search(r"['\"]([^'\"]+)['\"]", content)
-            if quoted:
-                candidate = quoted.group(1).strip().lstrip('!/')
-                return candidate.lower() if candidate else None
-
-            patterns = [
-                r"\b(?:has|for|about|named)\s+([a-zA-Z0-9_\-]+)\s+command\b",
-                r"\b([a-zA-Z0-9_\-]+)\s+command\b",
-                r"\bcommand\s+([a-zA-Z0-9_\-]+)\b",
-            ]
-            lowered = content.lower()
-            for pattern in patterns:
-                match = re.search(pattern, lowered)
-                if match:
-                    candidate = match.group(1).strip().lstrip('!/')
-                    if candidate and candidate not in {"which", "what", "the", "a", "an"}:
-                        return candidate
-
-            return None
-        except Exception as e:
-            logger.error(f"Failed extracting requested command: {e}")
-            return None
-
-    def _find_commands(self, requested_name: str) -> List[Tuple[str, str, List[str]]]:
-        """Find matching commands by name or alias."""
-        matches: List[Tuple[str, str, List[str]]] = []
-        try:
-            if not self.bot or not requested_name:
-                return matches
-
-            target = requested_name.lower().lstrip('!/')
-            for cmd in self.bot.commands:
-                aliases = [a.lower() for a in (cmd.aliases or [])]
-                cmd_name = (cmd.name or "").lower()
-                if cmd_name == target or target in aliases:
-                    matches.append((cmd.name, cmd.cog_name or "No Cog", list(cmd.aliases or [])))
-            return matches
-        except Exception as e:
-            logger.error(f"Failed finding command matches: {e}")
-            return matches
-
     def _build_command_inventory_lines(self) -> List[str]:
         """Build a readable list of all commands grouped by cog."""
         lines: List[str] = []
@@ -2370,20 +2323,6 @@ class ComplexAICog(commands.Cog):
     async def _send_command_inventory(self, message: discord.Message):
         """Send command-to-cog mapping in Discord-safe chunks."""
         try:
-            requested = self._extract_requested_command(message.content or "")
-            if requested:
-                matches = self._find_commands(requested)
-                if matches:
-                    details = []
-                    for name, cog_name, aliases in matches:
-                        alias_text = f" (aliases: {', '.join(aliases)})" if aliases else ""
-                        details.append(f"- {name} -> {cog_name}{alias_text}")
-                    await message.reply("Found command mapping:\n" + "\n".join(details[:20]))
-                    return
-
-                await message.reply(f"I couldn't find a command named `{requested}`.")
-                return
-
             lines = self._build_command_inventory_lines()
             body = "\n".join(lines).strip()
             if not body:
