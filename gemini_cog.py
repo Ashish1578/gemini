@@ -6,7 +6,7 @@ import asyncio
 import re
 import traceback
 import datetime         
-from typing import Optional, Dict, Any, List, Union, Callable
+from typing import Optional, Dict, Any, List, Union, Callable, Tuple
 import logging
 import sqlite3
 from pathlib import Path
