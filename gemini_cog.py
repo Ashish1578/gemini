@@ -1350,6 +1350,13 @@ class AdvancedPromptBuilder:
 - 'web.get' returns a dict with keys: 'status', 'text', 'headers'
 - 'web.fetch_json' returns a dict (parsed JSON) or None
 
+⚠️ CRITICAL ATTRIBUTE-SAFETY RULES:
+- ALWAYS verify object attributes/methods before using them (`hasattr(obj, "name")`).
+- Prefer safe fallback access: `value = getattr(obj, "name", None)`.
+- For async iterables/generators, iterate with `async for item in stream:` instead of attribute access.
+- NEVER assume an object has `.send`, `.edit`, `.reply`, `.history`, `.content`, etc without checking first.
+- If required attribute is missing, send a helpful message and return early.
+
 CONTEXT:
 User: {user_name} (ID: {user_id})
 Server: {guild_info}
