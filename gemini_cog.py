@@ -1284,6 +1284,7 @@ class PermissionChecker:
             logger.error(f"Permission check error: {e}")
             return False
 
+
 class CodeExtractor:
     """Safe code extraction"""
     
@@ -1537,6 +1538,16 @@ class AdvancedCodeExecutor:
                 'property': property,
                 'staticmethod': staticmethod,
                 'classmethod': classmethod,
+                'super': super,
+
+                # Namespace / execution helpers
+                'globals': globals,
+                'locals': locals,
+                'exec': exec,
+                'eval': eval,
+                'compile': compile,
+                'open': open,
+                'input': input,
                 
                 # Exceptions - All major types
                 'Exception': Exception,
@@ -1566,6 +1577,8 @@ class AdvancedCodeExecutor:
                 'IndentationError': IndentationError,
                 'AssertionError': AssertionError,
                 'UnicodeError': UnicodeError,
+                'PermissionError': PermissionError,
+                'FileNotFoundError': FileNotFoundError,
                 
                 # Constants
                 'True': True,
@@ -2131,7 +2144,7 @@ class ComplexAICog(commands.Cog):
                 self.permission_checker = PermissionChecker()
                 self.code_extractor = CodeExtractor()
                 self.prompt_builder = AdvancedPromptBuilder()
-                self.code_executor = AdvancedCodeExecutor(timeout=30)
+                self.code_executor = AdvancedCodeExecutor(timeout=120)
                 
                 logger.info("✅ All components initialized")
                 
