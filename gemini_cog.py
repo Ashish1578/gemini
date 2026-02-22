@@ -1284,6 +1284,7 @@ class PermissionChecker:
             logger.error(f"Permission check error: {e}")
             return False
 
+
 class CodeExtractor:
     """Safe code extraction"""
     
@@ -1537,6 +1538,16 @@ class AdvancedCodeExecutor:
                 'property': property,
                 'staticmethod': staticmethod,
                 'classmethod': classmethod,
+                'super': super,
+
+                # Namespace / execution helpers
+                'globals': globals,
+                'locals': locals,
+                'exec': exec,
+                'eval': eval,
+                'compile': compile,
+                'open': open,
+                'input': input,
                 
                 # Exceptions - All major types
                 'Exception': Exception,
@@ -1566,6 +1577,8 @@ class AdvancedCodeExecutor:
                 'IndentationError': IndentationError,
                 'AssertionError': AssertionError,
                 'UnicodeError': UnicodeError,
+                'PermissionError': PermissionError,
+                'FileNotFoundError': FileNotFoundError,
                 
                 # Constants
                 'True': True,
@@ -2131,7 +2144,7 @@ class ComplexAICog(commands.Cog):
                 self.permission_checker = PermissionChecker()
                 self.code_extractor = CodeExtractor()
                 self.prompt_builder = AdvancedPromptBuilder()
-                self.code_executor = AdvancedCodeExecutor(timeout=30)
+                self.code_executor = AdvancedCodeExecutor(timeout=120)
                 
                 logger.info("✅ All components initialized")
                 
@@ -2214,6 +2227,10 @@ class ComplexAICog(commands.Cog):
             if not content:
                 # Ignore empty messages (e.g. just image with no text)
                 return
+
+            if self._is_command_inventory_request(content):
+                await self._send_command_inventory(message)
+                return
             
             # Show typing indicator while processing
             async with message.channel.typing():
@@ -2250,7 +2267,97 @@ class ComplexAICog(commands.Cog):
         except Exception as e:
             logger.error(f"Content cleaning error: {e}")
             return ""
-    
+
+    def _is_command_inventory_request(self, content: str) -> bool:
+        """Detect requests asking for command-to-cog mapping."""
+        try:
+            normalized = (content or "").lower()
+            if not normalized:
+                return False
+
+            key_phrases = [
+                "which command",
+                "which cog",
+                "what cog",
+                "command list",
+                "list commands",
+                "show commands",
+                "commands in",
+                "cog commands",
+                "command mapping",
+                "what commands",
+            ]
+            return any(phrase in normalized for phrase in key_phrases)
+        except Exception as e:
+            logger.error(f"Inventory request detection error: {e}")
+            return False
+
+    def _build_command_inventory_lines(self) -> List[str]:
+        """Build a readable list of all commands grouped by cog."""
+        lines: List[str] = []
+        try:
+            if not self.bot:
+                return ["Bot instance unavailable."]
+
+            grouped: Dict[str, List[str]] = defaultdict(list)
+            for cmd in self.bot.commands:
+                cog_name = cmd.cog_name or "No Cog"
+                aliases = f" (aliases: {', '.join(cmd.aliases)})" if getattr(cmd, 'aliases', None) else ""
+                help_text = f" - {cmd.help.strip()}" if getattr(cmd, 'help', None) else ""
+                grouped[cog_name].append(f"!{cmd.name}{aliases}{help_text}")
+
+            if not grouped:
+                return ["No registered commands were found."]
+
+            for cog_name in sorted(grouped.keys(), key=lambda x: x.lower()):
+                lines.append(f"[{cog_name}]")
+                for cmd_line in sorted(grouped[cog_name], key=lambda x: x.lower()):
+                    lines.append(f"- {cmd_line}")
+                lines.append("")
+
+            return lines
+        except Exception as e:
+            logger.error(f"Failed building command inventory: {e}")
+            return [f"Error building command inventory: {str(e)[:200]}"]
+
+    async def _send_command_inventory(self, message: discord.Message):
+        """Send command-to-cog mapping in Discord-safe chunks."""
+        try:
+            lines = self._build_command_inventory_lines()
+            body = "\n".join(lines).strip()
+            if not body:
+                body = "No command inventory available."
+
+            chunks: List[str] = []
+            current = ""
+            for line in body.splitlines():
+                candidate = f"{current}\n{line}".strip() if current else line
+                if len(candidate) <= 1900:
+                    current = candidate
+                    continue
+
+                if current:
+                    chunks.append(current)
+                current = line
+
+            if current:
+                chunks.append(current)
+
+            header = "📚 Command map (command -> cog):"
+            if chunks:
+                await message.reply(f"{header}\n```\n{chunks[0]}\n```")
+                for extra_chunk in chunks[1:]:
+                    await message.channel.send(f"```\n{extra_chunk}\n```")
+            else:
+                await message.reply(f"{header}\nNo commands found.")
+
+        except Exception as e:
+            logger.error(f"Send command inventory error: {e}")
+            try:
+                await message.reply(f"❌ Failed to build command inventory: {str(e)[:200]}")
+            except Exception:
+                pass
+
     async def _get_ai_response(self, message: discord.Message, content: str) -> Optional[str]:
         try:
             if not self.model:
